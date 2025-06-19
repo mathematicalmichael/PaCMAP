@@ -1,6 +1,8 @@
 name: Publish
 
 on:
+  pull_request:
+    branches: [ main, dev ]
   push:
     branches: [ test-cd ]
     tags:
@@ -39,4 +41,4 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           password: ${{ secrets.PYPI_API_TOKEN }}
-        # if: startsWith(github.ref, 'refs/tags/v') && github.event_name == 'push'
+        if: startsWith(github.ref, 'refs/tags/v') && github.event_name == 'push'
