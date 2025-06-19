@@ -24,6 +24,7 @@ jobs:
         run: |
           sed -i'' -e 's/^name = "pacmap"/name = "pacmap-dev"/' pyproject.toml
           sed -i'' -e 's/The official implementation/The UNOFFICIAL community implementation/' pyproject.toml
+          sed -i'' -e 's|annoy|annoy-mm|' pyproject.toml
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
