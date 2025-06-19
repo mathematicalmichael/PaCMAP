@@ -1,6 +1,6 @@
 [project]
 name = "pacmap"
-version = "0.8.1"
+version = "0.8.1rc0"
 authors = [
     {name = "Yingfan Wang", email = "yingfan.wang@duke.edu"},
     {name = "Haiyang Huang"},
