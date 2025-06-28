@@ -1,6 +1,6 @@
 [project]
 name = "pacmap"
-version = "0.8.1rc1"
+version = "0.8.1rc2"
 authors = [
     {name = "Yingfan Wang", email = "yingfan.wang@duke.edu"},
     {name = "Haiyang Huang"},
@@ -22,7 +22,7 @@ classifiers = [
 dependencies = [
     "scikit-learn>=0.20",
     "numba>=0.57",
-    "annoy~=1.17.3",
+    "annoy>=1.17.3",
     "numpy>=1.20",
 ]
 
