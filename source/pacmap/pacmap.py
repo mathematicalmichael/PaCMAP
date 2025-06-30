@@ -11,8 +11,10 @@ import pickle as pkl
 
 from sklearn.base import BaseEstimator
 from sklearn.decomposition import TruncatedSVD, PCA
+from sklearn.utils.validation import check_is_fitted
 from sklearn import preprocessing
 from annoy import AnnoyIndex
+from typing import Optional
 
 global _RANDOM_STATE
 _RANDOM_STATE = None
@@ -360,7 +362,7 @@ def preprocess_X(X, distance, apply_pca, verbose, seed, high_dim, low_dim):
         xmin = 0  # placeholder
         xmax = 0  # placeholder
         xmean = np.mean(X, axis=0)
-        X -= np.mean(X, axis=0)
+        X -= xmean
         tsvd = TruncatedSVD(n_components=100, random_state=seed)
         X = tsvd.fit_transform(X)
         pca_solution = True
@@ -739,15 +741,40 @@ def save(instance, common_prefix: str):
         assert instance.tree is not None
 
 
-def load(common_prefix: str):
+def attach_index(reducer, index_path: str):
+    reducer.tree = AnnoyIndex(reducer.num_dimensions, reducer.distance)
+    reducer.tree.load(index_path)  # mmap the file
+    return reducer
+
+
+def load(
+        common_prefix: Optional[str] = None,
+        reducer_path: Optional[str] = None,
+        index_path: Optional[str] = None,
+    ):
     '''
     Load PaCMAP instance from a location specified by the user.
+    If the index and reducer are saved with `common_prefix`,
+    this will load both into the returned object.
+
+    Otherwise, pass `index_path` to attach any saved index and
+    `reducer_path` to load the saved associated reducer object.
+
+    Note: only one of `common_prefix` or `reducer_path` is needed.
     '''
-    with open(f"{common_prefix}.pkl", "rb") as fp:
-        instance = pkl.load(fp)
-    if os.path.exists(f"{common_prefix}.ann"):
-        instance.tree = AnnoyIndex(instance.num_dimensions, instance.distance)
-        instance.tree.load(f"{common_prefix}.ann")  # mmap the file
+    if reducer_path is not None:
+        with open(reducer_path, "rb") as fp:
+            instance = pkl.load(fp)
+    else:
+        with open(f"{common_prefix}.pkl", "rb") as fp:
+            instance = pkl.load(fp)
+
+    if index_path is not None:
+        instance = attach_index(instance, index_path)
+    else:  # attempt to load index from common path
+        index_path = f"{common_prefix}.ann"
+        if os.path.exists(index_path):
+            instance = attach_index(instance, index_path)
 
     return instance
 
@@ -913,12 +940,19 @@ class PaCMAP(BaseEstimator):
                             " requested. n_MN will be reduced.")
         self.n_MN = min(self.n_MN, n - 1)
 
+        disable_checks = os.environ.get("PACMAP_DISABLE_CHECKS", "").lower() in {"1", "true", "yes"}
         if self.n_neighbors < 1:
-            raise ValueError(
-                "The number of nearest neighbors can't be less than 1")
+            msg = "The number of nearest neighbors can't be less than 1"
+            if disable_checks:
+                logger.warning(msg)
+            else:
+                raise ValueError(msg)
         if self.n_FP < 1:
-            raise ValueError(
-                "The number of further points can't be less than 1")
+            msg = "The number of further points can't be less than 1"
+            if disable_checks:
+                logger.warning(msg)
+            else:
+                raise ValueError(msg)
 
     def fit(self, X, init=None, save_pairs=True):
         '''Projects a high dimensional dataset into a low-dimensional embedding, without returning the output.
@@ -1040,6 +1074,9 @@ class PaCMAP(BaseEstimator):
             Whether to save the pairs that are sampled from the dataset. Useful for reproducing results.
         '''
 
+        # If the estimator is not fitted, then raise NotFittedError
+        check_is_fitted(estimator=self, attributes="embedding_")
+
         # Preprocess the data
         X = np.copy(X).astype(np.float32)
         X = preprocess_X_new(X, self.distance, self.xmin, self.xmax,
@@ -1057,14 +1094,15 @@ class PaCMAP(BaseEstimator):
                                                  self.distance,
                                                  self.verbose
                                                  )
-        if not save_pairs:
-            self.pair_XP = None
-
         # Initialize and Optimize the embedding
         Y, intermediate_states = pacmap_fit(X, self.embedding_, self.n_components, self.pair_XP, self.lr,
                                             self.num_iters, init, self.verbose,
                                             self.intermediate, self.intermediate_snapshots,
                                             self.pca_solution, self.tsvd_transformer)
+
+        if not save_pairs:
+            self.pair_XP = None
+
         if self.intermediate:
             return intermediate_states
         else:
