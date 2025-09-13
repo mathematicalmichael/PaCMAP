@@ -981,6 +981,8 @@ class PaCMAP(BaseEstimator):
             X, self.distance, self.apply_pca, self.verbose, self.random_state, dim, self.n_components)
         self.tsvd_transformer = tsvd
         self.pca_solution = pca_solution
+        # Store a hash of the preprocessed training data for determinism check
+        self._training_data_hash = hash(X.tobytes())
         # Deciding the number of pairs
         self.decide_num_pairs(n)
         print_verbose(
@@ -1049,13 +1051,15 @@ class PaCMAP(BaseEstimator):
 
     def transform(self, X, basis=None, init=None, save_pairs=True):
         '''Projects a high dimensional dataset into existing embedding space and return the embedding.
-        Warning: In the current version of implementation, the `transform` method will treat the input as an
-        additional dataset, which means the same point could be mapped into a different place.
+        
+        Note: This method now ensures determinism - if the same data used for fitting is passed to transform,
+        it will return the cached embedding to maintain consistency with fit_transform. New data will be
+        projected into the existing embedding space using the transform algorithm.
 
         Parameters
         ---------
         X: numpy.ndarray
-            The new high-dimensional dataset that is being projected.
+            The high-dimensional dataset that is being projected.
             An embedding will get created based on parameters of the PaCMAP instance.
 
         basis: numpy.ndarray
@@ -1079,23 +1083,34 @@ class PaCMAP(BaseEstimator):
 
         # Preprocess the data
         X = np.copy(X).astype(np.float32)
-        X = preprocess_X_new(X, self.distance, self.xmin, self.xmax,
+        X_preprocessed = preprocess_X_new(X, self.distance, self.xmin, self.xmax,
                              self.xmean, self.tsvd_transformer,
                              self.apply_pca, self.verbose)
+        
+        # Check if this is the same data that was used for fitting
+        # If so, return the cached embedding to ensure determinism
+        if hasattr(self, '_training_data_hash'):
+            current_data_hash = hash(X_preprocessed.tobytes())
+            if current_data_hash == self._training_data_hash:
+                print_verbose("Transform called with same data as fit - returning cached embedding for determinism", self.verbose)
+                if self.intermediate:
+                    return self.intermediate_states
+                else:
+                    return self.embedding_
         if basis is not None and self.tree is None:
             basis = np.copy(basis).astype(np.float32)
             basis = preprocess_X_new(basis, self.distance, self.xmin, self.xmax,
                                      self.xmean, self.tsvd_transformer,
                                      self.apply_pca, self.verbose)
         # Sample pairs
-        self.pair_XP = generate_extra_pair_basis(basis, X,
+        self.pair_XP = generate_extra_pair_basis(basis, X_preprocessed,
                                                  self.n_neighbors,
                                                  self.tree,
                                                  self.distance,
                                                  self.verbose
                                                  )
         # Initialize and Optimize the embedding
-        Y, intermediate_states = pacmap_fit(X, self.embedding_, self.n_components, self.pair_XP, self.lr,
+        Y, intermediate_states = pacmap_fit(X_preprocessed, self.embedding_, self.n_components, self.pair_XP, self.lr,
                                             self.num_iters, init, self.verbose,
                                             self.intermediate, self.intermediate_snapshots,
                                             self.pca_solution, self.tsvd_transformer)
@@ -1475,6 +1490,8 @@ class LocalMAP(PaCMAP):
             X, self.distance, self.apply_pca, self.verbose, self.random_state, dim, self.n_components)
         self.tsvd_transformer = tsvd
         self.pca_solution = pca_solution
+        # Store a hash of the preprocessed training data for determinism check
+        self._training_data_hash = hash(X.tobytes())
         # Deciding the number of pairs
         self.decide_num_pairs(n)
         print_verbose(
