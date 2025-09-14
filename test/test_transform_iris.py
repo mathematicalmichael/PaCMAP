@@ -37,11 +37,20 @@ def test_iris_transform_with_tree(iris_data):
     generate_combined_figure(embeddings, labelset, titles, f'test_iris_transform_tree')
 
     # Test pair relationships
-    for i in range(10):
-        xp0 = reducer.pair_XP[i*100][0]
-        xp1 = reducer.pair_XP[i*100][1]
-        dist = np.linalg.norm(iris[xp0-len(iris)] - iris[xp1])
-        print(y[xp0], y[xp1], dist)
+    # Note: When transform is called with the same data as fit, 
+    # the new algorithmic consistency approach uses the same algorithm as fit_transform,
+    # so pair_XP will be empty (no new data projection pairs are needed)
+    if len(reducer.pair_XP) > 0:
+        # This means transform was called with different data
+        for i in range(min(10, len(reducer.pair_XP) // 100)):
+            xp0 = reducer.pair_XP[i*100][0]
+            xp1 = reducer.pair_XP[i*100][1]
+            dist = np.linalg.norm(iris[xp0-len(iris)] - iris[xp1])
+            print(y[xp0], y[xp1], dist)
+    else:
+        print("Transform used same algorithm as fit_transform (same data detected)")
+    
+    # Test the neighbor pairs (these are always available from the fit process)
     for i in range(10):
         xp0 = reducer.pair_neighbors[i*100][0]
         xp1 = reducer.pair_neighbors[i*100][1]
@@ -70,11 +79,20 @@ def test_iris_transform_without_tree(iris_data):
     generate_combined_figure(embeddings, labelset, titles, f'test_iris_transform')
 
     # Test pair relationships
-    for i in range(10):
-        xp0 = reducer.pair_XP[i*100][0]
-        xp1 = reducer.pair_XP[i*100][1]
-        dist = np.linalg.norm(iris[xp0-len(iris)] - iris[xp1])
-        print(y[xp0], y[xp1], dist)
+    # Note: When transform is called with the same data as fit, 
+    # the new algorithmic consistency approach uses the same algorithm as fit_transform,
+    # so pair_XP will be empty (no new data projection pairs are needed)
+    if len(reducer.pair_XP) > 0:
+        # This means transform was called with different data
+        for i in range(min(10, len(reducer.pair_XP) // 100)):
+            xp0 = reducer.pair_XP[i*100][0]
+            xp1 = reducer.pair_XP[i*100][1]
+            dist = np.linalg.norm(iris[xp0-len(iris)] - iris[xp1])
+            print(y[xp0], y[xp1], dist)
+    else:
+        print("Transform used same algorithm as fit_transform (same data detected)")
+    
+    # Test the neighbor pairs (these are always available from the fit process)
     for i in range(10):
         xp0 = reducer.pair_neighbors[i*100][0]
         xp1 = reducer.pair_neighbors[i*100][1]
