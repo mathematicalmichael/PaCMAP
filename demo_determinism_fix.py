@@ -41,9 +41,10 @@ def main():
         if np.allclose(embedding1, embedding2, rtol=1e-10, atol=1e-10):
             print("\n🎯 SUCCESS! fit_transform and fit+transform are now identical!")
             print(f"Maximum difference: {np.max(np.abs(embedding1 - embedding2)):.2e}")
-            print("\n✅ The determinism fix is working correctly!")
+            print("\n✅ The algorithmic consistency fix is working correctly!")
+            print("   Both methods now use the same optimization algorithm when called with identical data.")
         else:
-            print(f"\n❌ Still not deterministic. Max difference: {np.max(np.abs(embedding1 - embedding2))}")
+            print(f"\n❌ Still not consistent. Max difference: {np.max(np.abs(embedding1 - embedding2))}")
             return False
             
         # Test with different data  
@@ -65,11 +66,12 @@ def main():
         return False
 
 if __name__ == "__main__":
-    print("🔍 PaCMAP Determinism Fix Demo")
+    print("🔍 PaCMAP Algorithmic Consistency Fix Demo")
     print("=" * 40)
     success = main()
     if success:
-        print("\n🏆 All tests passed! The determinism fix is working perfectly.")
+        print("\n🏆 All tests passed! The algorithmic consistency fix is working perfectly.")
+        print("    The same mathematical optimization is now used for both fit_transform and fit+transform.")
     else:
         print("\n⚠️  Demo could not run due to missing dependencies.")
         print("The fix has been implemented and tested with mock data.")

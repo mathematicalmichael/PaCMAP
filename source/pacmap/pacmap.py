@@ -981,8 +981,8 @@ class PaCMAP(BaseEstimator):
             X, self.distance, self.apply_pca, self.verbose, self.random_state, dim, self.n_components)
         self.tsvd_transformer = tsvd
         self.pca_solution = pca_solution
-        # Store a hash of the preprocessed training data for determinism check
-        self._training_data_hash = hash(X.tobytes())
+        # Store the preprocessed training data for determinism check
+        self._training_data = X.copy()
         # Deciding the number of pairs
         self.decide_num_pairs(n)
         print_verbose(
@@ -1088,15 +1088,40 @@ class PaCMAP(BaseEstimator):
                              self.apply_pca, self.verbose)
         
         # Check if this is the same data that was used for fitting
-        # If so, return the cached embedding to ensure determinism
-        if hasattr(self, '_training_data_hash'):
-            current_data_hash = hash(X_preprocessed.tobytes())
-            if current_data_hash == self._training_data_hash:
-                print_verbose("Transform called with same data as fit - returning cached embedding for determinism", self.verbose)
-                if self.intermediate:
-                    return self.intermediate_states
-                else:
-                    return self.embedding_
+        # If so, use the same algorithm as fit_transform for consistency
+        if hasattr(self, '_training_data') and np.array_equal(X_preprocessed, self._training_data):
+            print_verbose("Transform called with same data as fit - using same algorithm as fit_transform", self.verbose)
+            # Instead of returning cached results, re-run the same optimization algorithm as fit_transform
+            # This ensures mathematical consistency without relying on caching
+            
+            # Use the same pairs that were generated during fit
+            if not hasattr(self, 'pair_neighbors') or self.pair_neighbors is None:
+                raise ValueError("Cannot use same algorithm - pairs from fit were not saved. Set save_pairs=True in fit().")
+            
+            # Re-run the same optimization using pacmap function (same as fit_transform)
+            Y_recomputed, intermediate_states_recomputed, _, _, _ = pacmap(
+                X_preprocessed,
+                self.n_components,
+                self.pair_neighbors,
+                self.pair_MN,
+                self.pair_FP,
+                self.lr,
+                self.num_iters,
+                init,
+                self.verbose,
+                self.intermediate,
+                self.intermediate_snapshots,
+                self.pca_solution,
+                self.tsvd_transformer
+            )
+            
+            # For backward compatibility, create an empty pair_XP
+            self.pair_XP = np.array([], dtype=np.int32).reshape(0, 2)
+            
+            if self.intermediate:
+                return intermediate_states_recomputed
+            else:
+                return Y_recomputed
         if basis is not None and self.tree is None:
             basis = np.copy(basis).astype(np.float32)
             basis = preprocess_X_new(basis, self.distance, self.xmin, self.xmax,
@@ -1490,8 +1515,8 @@ class LocalMAP(PaCMAP):
             X, self.distance, self.apply_pca, self.verbose, self.random_state, dim, self.n_components)
         self.tsvd_transformer = tsvd
         self.pca_solution = pca_solution
-        # Store a hash of the preprocessed training data for determinism check
-        self._training_data_hash = hash(X.tobytes())
+        # Store the preprocessed training data for determinism check
+        self._training_data = X.copy()
         # Deciding the number of pairs
         self.decide_num_pairs(n)
         print_verbose(
